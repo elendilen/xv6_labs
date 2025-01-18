@@ -7,17 +7,16 @@ void prime(int n)
     int p[2];
     if (read(n, &sieve, sizeof(int)) <= 0 || sieve <= 0)
     {
-        printf("error!!!!\n");
         exit(1);
     }
     printf("prime %d\n", sieve);
     pipe(p);
-    fork();
-    pid = getpid();
+    pid = fork();
     if (pid == 0)
     {
         close(p[1]);
         prime(p[0]);
+        close(p[0]);
     }
     else
     {
@@ -29,6 +28,8 @@ void prime(int n)
                 write(p[1], &num, sizeof(int));
             }
         }
+        close(p[1]);
+        close(n);
     }
 }
 void PrimeStart()
@@ -38,7 +39,7 @@ void PrimeStart()
     pipe(p);
     if (fork() == 0)
     {
-        for (i = 2; i < 15; i++)
+        for (i = 2; i < 280; i++)
         {
             write(p[1], &i, sizeof(int));
         }
