@@ -49,7 +49,7 @@ void find(char *path, char *name)
     //fprintf(2,"name:%s,fmt:%s\n",name,fmtname(path));
     if (!strcmp(fmtname(path), name))
     {
-      fprintf(2, "%s\n", path);
+      printf( "%s\n", path);
     }
     break;
   case T_DIR:
@@ -74,7 +74,7 @@ void find(char *path, char *name)
             find(buf, name);
         }else if(st.type == T_FILE||st.type == T_DEVICE){
             if(!strcmp(name,fmtname(buf))){
-              fprintf(2,"%s\n",buf);
+              printf("%s\n",buf);
             }
         }
       }
