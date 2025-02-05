@@ -122,7 +122,11 @@ superpg_test()
   
   char *end = sbrk(N);
   if (end == 0 || end == (char*)0xffffffffffffffff)
-    err("sbrk failed");
+    {
+      printf("%d\n",end == 0);
+      err("sbrk failed");
+    }
+    
   
   uint64 s = SUPERPGROUNDUP((uint64) end);
   supercheck(s);
