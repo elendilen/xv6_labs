@@ -9,7 +9,7 @@
 struct spinlock tickslock;
 uint ticks;
 
-extern char trampoline[], uservec[], userret[];
+extern char trampoline[], uservec[], userret[], saved_trapframe[];
 
 // in kernelvec.S, calls kerneltrap().
 void kernelvec();
@@ -77,10 +77,26 @@ usertrap(void)
     exit(-1);
 
   // give up the CPU if this is a timer interrupt.
-  if(which_dev == 2)
-    yield();
+   if(which_dev == 2)
+   {
+        if(p->alarm_ticks)
+        {
+          p->ticks_count++;
+          if(p->ticks_count >= p->alarm_ticks && p->handling_alarm == 0)
+          {
+              p->ticks_count = 0;
+            memmove(saved_trapframe,p->trapframe,512);
+            p->saved_a0 = p->trapframe->a0;
+            p->handling_alarm = 1;
+            p->trapframe->epc = (uint64)p->alarm_handler;
+          }
+        }
+        
+      yield();
+    }
 
   usertrapret();
+
 }
 
 //
@@ -106,7 +122,7 @@ usertrapret(void)
   p->trapframe->kernel_sp = p->kstack + PGSIZE; // process's kernel stack
   p->trapframe->kernel_trap = (uint64)usertrap;
   p->trapframe->kernel_hartid = r_tp();         // hartid for cpuid()
-
+  
   // set up the registers that trampoline.S's sret will use
   // to get to user space.
   
@@ -118,10 +134,9 @@ usertrapret(void)
 
   // set S Exception Program Counter to the saved user pc.
   w_sepc(p->trapframe->epc);
-
+  
   // tell trampoline.S the user page table to switch to.
   uint64 satp = MAKE_SATP(p->pagetable);
-
   // jump to userret in trampoline.S at the top of memory, which 
   // switches to the user page table, restores user registers,
   // and switches to user mode with sret.

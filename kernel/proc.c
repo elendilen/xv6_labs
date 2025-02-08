@@ -12,6 +12,8 @@ struct proc proc[NPROC];
 
 struct proc *initproc;
 
+char saved_trapframe[512];
+
 int nextpid = 1;
 struct spinlock pid_lock;
 
@@ -131,7 +133,10 @@ found:
     release(&p->lock);
     return 0;
   }
-
+  p->alarm_ticks = 0;
+  p->alarm_handler = 0;
+  p->handling_alarm = 0;
+  p->ticks_count = 0;
   // An empty user page table.
   p->pagetable = proc_pagetable(p);
   if(p->pagetable == 0){
@@ -168,6 +173,10 @@ freeproc(struct proc *p)
   p->chan = 0;
   p->killed = 0;
   p->xstate = 0;
+  p->alarm_ticks = 0;
+  p->alarm_handler = 0;
+  p->handling_alarm = 0;
+  p->ticks_count = 0;
   p->state = UNUSED;
 }
 
