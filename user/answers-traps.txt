@@ -1,0 +1,4 @@
+1. a1 held 12(f(8)+1), a2 held 13
+2. the call to f and g is not in the assembly, but calculated when processing the .c file into .asm
+3. 68c000ef should be the place of printf
+4. ra = 
