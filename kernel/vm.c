@@ -315,22 +315,24 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
   pte_t *pte;
   uint64 pa, i;
   uint flags;
-  char *mem;
+  //char *mem;
 
   for(i = 0; i < sz; i += PGSIZE){
     if((pte = walk(old, i, 0)) == 0)
       panic("uvmcopy: pte should exist");
     if((*pte & PTE_V) == 0)
       panic("uvmcopy: page not present");
-    pa = PTE2PA(*pte);
+  if(*pte & PTE_W){
+    *pte &= ~PTE_W;
+    *pte |= PTE_C;
+  }
+	
     flags = PTE_FLAGS(*pte);
-    if((mem = kalloc()) == 0)
-      goto err;
-    memmove(mem, (char*)pa, PGSIZE);
-    if(mappages(new, i, PGSIZE, (uint64)mem, flags) != 0){
-      kfree(mem);
-      goto err;
-    }
+    pa = PTE2PA(*pte);
+	if(mappages(new, i, PGSIZE, pa, flags) != 0){
+			goto err;
+	}
+	increase(pa);
   }
   return 0;
 
@@ -362,9 +364,17 @@ copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len)
   pte_t *pte;
 
   while(len > 0){
-    va0 = PGROUNDDOWN(dstva);
-    if(va0 >= MAXVA)
+    va0 = PGROUNDDOWN(dstva); 
+    int res = IsCow(pagetable,va0);
+    if(res > 0){
+      if(CowAlloc(pagetable,va0) < 0) 
+	      return -1;
+    }else if(res < 0){
+      printf("res = %d\n",res);
       return -1;
+    }
+   
+	
     pte = walk(pagetable, va0, 0);
     if(pte == 0 || (*pte & PTE_V) == 0 || (*pte & PTE_U) == 0 ||
        (*pte & PTE_W) == 0)
@@ -448,4 +458,41 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
   } else {
     return -1;
   }
+}
+
+int IsCow(pagetable_t pagetable, uint64 va){
+  if(va >= MAXVA) return -1;
+  pte_t* pte = walk(pagetable, va, 0);
+  if(pte == 0)             // 如果这个页不存在
+    return -2;
+  if((*pte & PTE_V) == 0)
+    return -3;
+  if((*pte & PTE_U) == 0)
+    return -4;
+  return (*pte)&PTE_C; 
+}
+
+int CowAlloc(pagetable_t pagetable, uint64 va){
+  pte_t* pte = walk(pagetable, va, 0);
+  uint64 perm = PTE_FLAGS(*pte);
+
+  if(pte == 0) return -1;
+  if(*pte & PTE_W) return -1;
+  uint64 prev_sta = PTE2PA(*pte);
+  uint64 newpage = (uint64)kalloc();
+  if(newpage == 0){
+    return -1;
+  }
+  uint64 va_sta = PGROUNDDOWN(va);
+  perm &= (~PTE_C);
+  perm |= PTE_W;
+  
+  memmove((void*)newpage, (void*)prev_sta, PGSIZE);
+  uvmunmap(pagetable, va_sta, 1, 1);
+
+  if(mappages(pagetable, va_sta, PGSIZE, (uint64)newpage, perm) < 0){
+    kfree((void*)newpage);
+    return -1;
+  }
+  return 0;
 }
